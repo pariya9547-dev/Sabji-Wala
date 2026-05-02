@@ -254,21 +254,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
           </div>
         </header>
 
-        {auth.currentUser?.email === 'pariya9547@gmail.com' && (
+        {auth.currentUser?.email === 'pariya9547@gmail.com' && !loading && (
           <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-2xl flex items-center justify-between">
             <p className="text-xs text-blue-700">
-              <span className="font-bold">Owner Access:</span> You are accessing this via email verification. Would you like to register your account in the permanent admin list?
+              <span className="font-bold">Owner Access:</span> You are currently accessing the dashboard via email match. Click verify to permanently register as the database owner.
             </p>
             <button 
-              onClick={async () => {
-                const { setDoc, doc } = await import('firebase/firestore');
-                await setDoc(doc(db, 'admins', auth.currentUser!.uid), {
-                  email: auth.currentUser!.email,
-                  role: 'owner'
-                }, { merge: true });
-                alert("Registered as permanent admin!");
+              id="verify-owner-btn"
+              onClick={async (e) => {
+                const btn = e.currentTarget;
+                btn.disabled = true;
+                btn.textContent = 'Verifying...';
+                try {
+                  const { setDoc, doc } = await import('firebase/firestore');
+                  await setDoc(doc(db, 'admins', auth.currentUser!.uid), {
+                    uid: auth.currentUser!.uid,
+                    email: auth.currentUser!.email,
+                    role: 'owner',
+                    verifiedAt: new Date().toISOString()
+                  }, { merge: true });
+                  alert("Successfully registered as permanent owner!");
+                  // The UI will update on next check or we can force a refresh
+                  window.location.reload();
+                } catch (error) {
+                  console.error("Verification failed:", error);
+                  alert("Verification failed. Check console for details.");
+                  btn.disabled = false;
+                  btn.textContent = 'Verify Now';
+                }
               }}
-              className="px-4 py-1.5 bg-blue-600 text-white text-[10px] font-bold rounded-lg hover:bg-blue-700"
+              className="px-4 py-1.5 bg-blue-600 text-white text-[10px] font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-all"
             >
               Verify Now
             </button>
