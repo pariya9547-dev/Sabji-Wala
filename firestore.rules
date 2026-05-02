@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) || 
+        (request.auth.token.email == 'pariya9547@gmail.com' && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Vegetable Catalog
+    match /vegetables/{vegetableId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidId(vegetableId);
+    }
+
+    // Orders
+    match /orders/{orderId} {
+      // Customers can create orders (even if not signed in for this demo, or we can force sign-in)
+      // For now, allow public creation to make it easy, but strictly validate
+      allow create: if isValidId(orderId) &&
+                      incoming().keys().hasAll(['customer', 'items', 'total', 'status', 'createdAt']) &&
+                      incoming().status == 'pending';
+      
+      // Only admins can read or update orders
+      allow read: if isAdmin();
+      allow update: if isAdmin() && isValidId(orderId);
+      allow delete: if isAdmin();
+    }
+
+    // Admins collection
+    match /admins/{adminId} {
+      allow read: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
+      // Allow the designated owner to register themselves
+      allow write: if isSignedIn() && request.auth.uid == adminId && request.auth.token.email == 'pariya9547@gmail.com';
+      // Also allow existing admins to manage other admins (careful!)
+      allow write: if isAdmin();
+    }
+  }
+}
